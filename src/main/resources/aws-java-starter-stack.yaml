@@ -1,13 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: AWS CloudFormation Template for a simple Java AWS Stack
 Resources:
-  JavaServerHost:
-    Type: AWS::EC2::Instance
-    Properties:
-      ImageId: ami-013be31976ca2c322
-      KeyName: aws-java-starter
-      SecurityGroups:
-      - !Ref JavaServerSecurityGroup
   JavaServerSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -21,4 +14,34 @@ Resources:
         FromPort: 22
         ToPort: 22
         CidrIp: 0.0.0.0/0
+  JavaServerHost:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: ami-013be31976ca2c322
+      KeyName: aws-java-starter
+      SecurityGroups:
+      - !Ref JavaServerSecurityGroup
+      UserData:
+        Fn::Base64: |
+          #!/bin/bash
+          yum update -y
+          JDK_URL=https://download.oracle.com/otn-pub/java/jdk/8u191-b12/2787e4a523244c269598db4e85c51e0c/jdk-8u191-linux-x64.tar.gz
+          JDK_VER=jdk1.8.0_191
+          CUR_USER=${SUDO_USER:-$(tail -1 /etc/passwd | cut -d: -f1)}
+
+          installJDK() {
+            yum -y install wget
+            wget --no-cookies --no-check-certificate --header "Cookie: oraclelicense=accept-securebackup-cookie" ${JDK_URL} -O /tmp/`basename ${JDK_URL}`
+            mkdir -p /usr/java
+            (cd /usr/java && tar zxvf /tmp/jdk-*.tar.gz && rm /tmp/jdk-*.tar.gz)
+            chown -R ${CUR_USER} /usr/java
+            alternatives --install /usr/bin/java java /usr/java/${JDK_VER}/bin/java 1
+            alternatives --install /usr/bin/jar jar /usr/java/${JDK_VER}/bin/jar 1
+            alternatives --install /usr/bin/javac javac /usr/java/${JDK_VER}/bin/javac 1
+            alternatives --install /usr/bin/jps jps /usr/java/${JDK_VER}/bin/jps 1
+            echo JAVA_HOME=/usr/java/${JDK_VER} >> /etc/environment
+          }
+
+          installJDK
+
 
