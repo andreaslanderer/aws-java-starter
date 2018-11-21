@@ -22,26 +22,28 @@ Resources:
       SecurityGroups:
       - !Ref JavaServerSecurityGroup
       UserData:
-        Fn::Base64: |
-          #!/bin/bash
-          yum update -y
-          JDK_URL=https://download.oracle.com/otn-pub/java/jdk/8u191-b12/2787e4a523244c269598db4e85c51e0c/jdk-8u191-linux-x64.tar.gz
-          JDK_VER=jdk1.8.0_191
-          CUR_USER=${SUDO_USER:-$(tail -1 /etc/passwd | cut -d: -f1)}
+        "Fn::Base64":
+          !Sub |
+          #!/bin/bash -xe
+          # Get the latest CloudFormation package
+          yum update -y aws-cfn-bootstrap
+          # Start cfn-init
+          /opt/aws/bin/cfn-init -s ${AWS::StackId} -r JavaServerHost --region ${AWS::Region} || error_exit 'Failed to run cfn-init'
+          # Start up the cfn-hup daemon to listen for changes to the EC2 instance metadata
+          /opt/aws/bin/cfn-hup || error_exit 'Failed to start cfn-hup'
+          # All done so signal success
+          /opt/aws/bin/cfn-signal -e $? --stack ${AWS::StackId} --resource JavaServerHost --region ${AWS::Region}
+    Metadata:
+      AWS::CloudFormation::Init:
+        config:
+          packages:
+            yum:
+              java-1.8.0-openjdk: []
+          services:
+            sysvinit:
+              java:
+                enabled: 'true'
+                ensureRunning: 'true'
 
-          installJDK() {
-            yum -y install wget
-            wget --no-cookies --no-check-certificate --header "Cookie: oraclelicense=accept-securebackup-cookie" ${JDK_URL} -O /tmp/`basename ${JDK_URL}`
-            mkdir -p /usr/java
-            (cd /usr/java && tar zxvf /tmp/jdk-*.tar.gz && rm /tmp/jdk-*.tar.gz)
-            chown -R ${CUR_USER} /usr/java
-            alternatives --install /usr/bin/java java /usr/java/${JDK_VER}/bin/java 1
-            alternatives --install /usr/bin/jar jar /usr/java/${JDK_VER}/bin/jar 1
-            alternatives --install /usr/bin/javac javac /usr/java/${JDK_VER}/bin/javac 1
-            alternatives --install /usr/bin/jps jps /usr/java/${JDK_VER}/bin/jps 1
-            echo JAVA_HOME=/usr/java/${JDK_VER} >> /etc/environment
-          }
-
-          installJDK
 
 
